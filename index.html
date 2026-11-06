@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solicitudes de datos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EEF2; --surface:#FFFFFF; --ink:#18232E; --muted:#5B6B7A; --line:#CFD8E0;
+  --accent:#1F4E79; --accent-ink:#FFFFFF;
+  --st-pend:#B45309; --st-proc:#1F4E79; --st-done:#2F7D4F;
+  --pr-alta:#B42318;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#121A22; --surface:#1B2631; --ink:#E4EBF1; --muted:#93A3B2; --line:#2E3C49;
+    --accent:#7FB0DD; --accent-ink:#0E1820;
+    --st-pend:#F0A35A; --st-proc:#7FB0DD; --st-done:#6CC793; --pr-alta:#F2867C;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Instrument Sans",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:20px clamp(16px,4vw,40px);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+h1 small{display:block;font-size:.85rem;font-weight:400;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:6px;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.danger{color:var(--pr-alta)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;padding:14px clamp(16px,4vw,40px)}
+.toolbar input,.toolbar select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.toolbar input{flex:1;min-width:200px}
+
+.board{display:grid;grid-template-columns:repeat(3,minmax(260px,1fr));gap:16px;padding:0 clamp(16px,4vw,40px) 40px;overflow-x:auto}
+.col{min-width:260px}
+.col h2{display:flex;justify-content:space-between;font-size:.95rem;margin:4px 0 10px;padding-bottom:6px;border-bottom:3px solid var(--c)}
+.col h2 span{color:var(--muted);font-weight:500}
+.col[data-st="Pendiente"]{--c:var(--st-pend)}
+.col[data-st="En proceso"]{--c:var(--st-proc)}
+.col[data-st="Entregada"]{--c:var(--st-done)}
+.list{display:flex;flex-direction:column;gap:8px}
+.empty{color:var(--muted);font-size:.9rem;padding:12px 0}
+
+.ticket{text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:4px;padding:10px 12px;cursor:pointer}
+.ticket .folio{font-family:"Spline Sans Mono",ui-monospace,monospace;font-size:.8rem;color:var(--muted)}
+.ticket .t{font-weight:600;margin:2px 0 4px}
+.ticket .meta{font-size:.82rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
+.tag-alta{color:var(--pr-alta);font-weight:600}
+
+dialog{border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:0;width:min(640px,94vw)}
+dialog::backdrop{background:rgba(10,20,30,.45)}
+.dlg{padding:22px}
+.dlg h3{margin:0 0 4px;font-size:1.2rem}
+.folio-big{font-family:"Spline Sans Mono",ui-monospace,monospace;font-size:1.6rem;color:var(--accent)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.grid .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:.88rem;color:var(--muted)}
+label input,label select,label textarea{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--ink)}
+textarea{min-height:90px;resize:vertical}
+.foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:18px}
+.foot .left{margin-right:auto}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.92rem;margin:14px 0}
+.kv dt{color:var(--muted)} .kv dd{margin:0;white-space:pre-wrap}
+.hist{font-size:.85rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;margin-top:10px;max-height:160px;overflow:auto}
+.hist p{margin:0 0 4px}
+@media (max-width:560px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Solicitudes de información y cruce de datos<small>Registro y seguimiento de requerimientos</small></h1>
+  <div class="actions">
+    <button class="btn primary" id="btnNew">Nueva solicitud</button>
+    <button class="btn" id="btnCsv">Exportar CSV</button>
+    <button class="btn" id="btnExport">Respaldar JSON</button>
+    <button class="btn" id="btnImport">Restaurar JSON</button>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input id="q" type="search" placeholder="Buscar por folio, solicitante, unidad o descripción">
+  <select id="fTipo"><option value="">Todos los tipos</option></select>
+  <select id="fPrio"><option value="">Todas las prioridades</option><option>Alta</option><option>Media</option><option>Baja</option></select>
+</div>
+
+<main class="board" id="board"></main>
+
+<!-- Formulario -->
+<dialog id="dlgForm">
+  <form class="dlg" id="form" method="dialog">
+    <h3 id="formTitle">Nueva solicitud</h3>
+    <div class="grid">
+      <label>Solicitante<input name="solicitante" required></label>
+      <label>Unidad / carrera<input name="unidad" required></label>
+      <label>Correo<input name="correo" type="email"></label>
+      <label>Tipo<select name="tipo" id="selTipo"></select></label>
+      <label class="full">Título breve<input name="titulo" required maxlength="90"></label>
+      <label class="full">Detalle de lo solicitado<textarea name="descripcion" required placeholder="Qué datos necesita, para qué período, qué variables cruzar"></textarea></label>
+      <label class="full">Fuentes de datos involucradas<input name="fuentes" placeholder="Ej: matrícula 2026, asistencia, notas parciales"></label>
+      <label>Prioridad<select name="prioridad"><option>Media</option><option>Alta</option><option>Baja</option></select></label>
+    </div>
+    <div class="foot">
+      <button class="btn" value="cancel" formnovalidate>Cancelar</button>
+      <button class="btn primary" id="btnSave" value="save">Guardar solicitud</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Detalle -->
+<dialog id="dlgView"><div class="dlg" id="view"></div></dialog>
+
+<script>
+const KEY = "ticketera-datos-v1";
+const TIPOS = ["Información puntual","Cruce de datos","Reporte / estadística","Extracción de base"];
+const ESTADOS = ["Pendiente","En proceso","Entregada"];
+const $ = s => document.querySelector(s);
+
+let db = load();
+let editingId = null;
+
+function load(){
+  try { return JSON.parse(localStorage.getItem(KEY)) || {seq:0, items:[]}; }
+  catch { return {seq:0, items:[]}; }
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch { alert("No se pudo guardar en este navegador. Respalda en JSON."); }
+}
+const folio = n => "SOL-" + String(n).padStart(4,"0");
+const hoy = () => new Date().toISOString().slice(0,10);
+const fmt = iso => iso ? new Date(iso + (iso.length===10?"T12:00":"")).toLocaleDateString("es-CL") : "—";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+TIPOS.forEach(t => { $("#selTipo").add(new Option(t)); $("#fTipo").add(new Option(t)); });
+
+function render(){
+  const q = $("#q").value.toLowerCase().trim();
+  const ft = $("#fTipo").value, fp = $("#fPrio").value;
+  const rank = {Alta:0, Media:1, Baja:2};
+  const items = db.items.filter(i =>
+    (!ft || i.tipo===ft) && (!fp || i.prioridad===fp) &&
+    (!q || [folio(i.n), i.solicitante, i.unidad, i.titulo, i.descripcion].join(" ").toLowerCase().includes(q))
+  ).sort((a,b) => rank[a.prioridad]-rank[b.prioridad] || a.creada.localeCompare(b.creada));
+
+  $("#board").innerHTML = ESTADOS.map(st => {
+    const list = items.filter(i => i.estado===st);
+    return `<section class="col" data-st="${st}">
+      <h2>${st} <span>${list.length}</span></h2>
+      <div class="list">${list.length ? list.map(card).join("") : `<p class="empty">Sin solicitudes.</p>`}</div>
+    </section>`;
+  }).join("");
+}
+
+function card(i){
+  return `<button class="ticket" data-id="${i.id}" style="--c:var(${i.estado==="Pendiente"?"--st-pend":i.estado==="En proceso"?"--st-proc":"--st-done"})">
+    <div class="folio">${folio(i.n)}</div>
+    <div class="t">${esc(i.titulo)}</div>
+    <div class="meta">
+      <span>${esc(i.solicitante)} · ${esc(i.unidad)}</span>
+      <span>${esc(i.tipo)}</span>
+      ${i.prioridad==="Alta" ? `<span class="tag-alta">Prioridad alta</span>` : ""}
+      <span>Ingresada ${fmt(i.creada.slice(0,10))}</span>
+    </div>
+  </button>`;
+}
+
+function openForm(item){
+  editingId = item?.id || null;
+  const f = $("#form"); f.reset();
+  $("#formTitle").textContent = item ? `Editar ${folio(item.n)}` : "Nueva solicitud";
+  $("#btnSave").textContent = item ? "Guardar cambios" : "Guardar solicitud";
+  if(item) for(const k of ["solicitante","unidad","correo","tipo","titulo","descripcion","fuentes","prioridad"]) f.elements[k].value = item[k] || "";
+  $("#dlgForm").showModal();
+}
+
+$("#dlgForm").addEventListener("close", () => {
+  if($("#dlgForm").returnValue !== "save") return;
+  const data = Object.fromEntries(new FormData($("#form")));
+  if(editingId){
+    const it = db.items.find(i => i.id===editingId);
+    Object.assign(it, data);
+    it.hist.push({f:new Date().toISOString(), m:"Solicitud editada"});
+  } else {
+    db.seq++;
+    db.items.push({...data, id:crypto.randomUUID(), n:db.seq, estado:"Pendiente",
+      creada:new Date().toISOString(), nota:"", hist:[{f:new Date().toISOString(), m:"Solicitud creada"}]});
+  }
+  save(); render();
+});
+
+function openView(id){
+  const i = db.items.find(x => x.id===id);
+  $("#view").innerHTML = `
+    <div class="folio-big">${folio(i.n)}</div>
+    <h3>${esc(i.titulo)}</h3>
+    <dl class="kv">
+      <dt>Solicitante</dt><dd>${esc(i.solicitante)}${i.correo?` (${esc(i.correo)})`:""}</dd>
+      <dt>Unidad</dt><dd>${esc(i.unidad)}</dd>
+      <dt>Tipo</dt><dd>${esc(i.tipo)}</dd>
+      <dt>Prioridad</dt><dd>${esc(i.prioridad)}</dd>
+      <dt>Ingresada</dt><dd>${fmt(i.creada.slice(0,10))}</dd>
+      <dt>Fuentes</dt><dd>${esc(i.fuentes)||"—"}</dd>
+      <dt>Detalle</dt><dd>${esc(i.descripcion)}</dd>
+    </dl>
+    <div class="grid">
+      <label>Estado<select id="vEstado">${ESTADOS.map(s=>`<option ${s===i.estado?"selected":""}>${s}</option>`).join("")}</select></label>
+      <label class="full">Notas de trabajo (consultas usadas, archivo entregado, etc.)<textarea id="vNota">${esc(i.nota)}</textarea></label>
+    </div>
+    <div class="hist">${i.hist.slice().reverse().map(h=>`<p>${new Date(h.f).toLocaleString("es-CL")}: ${esc(h.m)}</p>`).join("")}</div>
+    <div class="foot">
+      <button class="btn danger left" id="vDel">Eliminar</button>
+      <button class="btn" id="vEdit">Editar datos</button>
+      <button class="btn" id="vClose">Cerrar</button>
+      <button class="btn primary" id="vSave">Guardar cambios</button>
+    </div>`;
+  $("#vClose").onclick = () => $("#dlgView").close();
+  $("#vEdit").onclick = () => { $("#dlgView").close(); openForm(i); };
+  $("#vDel").onclick = () => {
+    if(!confirm(`¿Eliminar ${folio(i.n)}? No se puede deshacer.`)) return;
+    db.items = db.items.filter(x => x.id!==i.id); save(); render(); $("#dlgView").close();
+  };
+  $("#vSave").onclick = () => {
+    const est = $("#vEstado").value, nota = $("#vNota").value;
+    if(est!==i.estado) i.hist.push({f:new Date().toISOString(), m:`Estado: ${i.estado} → ${est}`});
+    if(nota!==i.nota) i.hist.push({f:new Date().toISOString(), m:"Notas actualizadas"});
+    i.estado = est; i.nota = nota; save(); render(); $("#dlgView").close();
+  };
+  $("#dlgView").showModal();
+}
+
+$("#board").addEventListener("click", e => { const b = e.target.closest(".ticket"); if(b) openView(b.dataset.id); });
+$("#btnNew").onclick = () => openForm();
+["#q","#fTipo","#fPrio"].forEach(s => $(s).addEventListener("input", render));
+
+function download(name, text, type){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+$("#btnExport").onclick = () => download(`solicitudes_${hoy()}.json`, JSON.stringify(db,null,2), "application/json");
+$("#btnCsv").onclick = () => {
+  const cols = ["folio","estado","prioridad","tipo","titulo","solicitante","unidad","correo","creada","fuentes","descripcion","nota"];
+  const q = v => `"${String(v??"").replace(/"/g,'""')}"`;
+  const rows = db.items.map(i => cols.map(c => q(c==="folio"?folio(i.n):c==="creada"?i.creada.slice(0,10):i[c])).join(";"));
+  download(`solicitudes_${hoy()}.csv`, "\uFEFF" + [cols.join(";"), ...rows].join("\n"), "text/csv");
+};
+$("#btnImport").onclick = () => $("#fileImport").click();
+$("#fileImport").onchange = async e => {
+  const file = e.target.files[0]; if(!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if(!Array.isArray(data.items)) throw 0;
+    if(!confirm(`Se reemplazarán las solicitudes actuales por ${data.items.length} del respaldo. ¿Continuar?`)) return;
+    db = data; save(); render();
+  } catch { alert("El archivo no es un respaldo válido de esta ticketera."); }
+  e.target.value = "";
+};
+
+render();
+</script>
+</body>
+</html>
